@@ -32,83 +32,61 @@ export default function GPACalculator() {
   const [courses, setCourses] = useState(initialCourses);
   const [grades, setGrades] = useState(initialCourses.map(() => "A+"));
 
-  // ✅ undo state
-  const [lastDeleted, setLastDeleted] = useState(null);
-  const [undoTimer, setUndoTimer] = useState(null);
+  const [showToast, setShowToast] = useState(false);
+  const [timerId, setTimerId] = useState(null);
 
-  const totalSemesterCredits = useMemo(() => {
-    return courses.reduce((sum, c) => sum + (Number(c.credits) || 0), 0);
-  }, [courses]);
+  // Load saved data
+  useEffect(() => {
+    const saved = localStorage.getItem("gpa-data");
+    if (saved) {
+      const data = JSON.parse(saved);
+      setCourses(data.courses);
+      setGrades(data.grades);
+      setPastCGPA(data.pastCGPA);
+      setPastCredits(data.pastCredits);
+    }
+  }, []);
 
-  const totalPoints = useMemo(() => {
-    return courses.reduce((sum, course, i) => {
-      const credits = Number(course.credits) || 0;
-      return sum + credits * gradeMap[grades[i]];
-    }, 0);
-  }, [courses, grades]);
+  const saveData = () => {
+    localStorage.setItem(
+      "gpa-data",
+      JSON.stringify({ courses, grades, pastCGPA, pastCredits })
+    );
 
-  const semesterGPA = (
-    totalSemesterCredits === 0 ? 0 : totalPoints / totalSemesterCredits
-  ).toFixed(3);
-
-  const safePastCGPA = isNaN(pastCGPA) ? 0 : pastCGPA;
-  const safePastCredits = isNaN(pastCredits) ? 0 : pastCredits;
-
-  const denominator = safePastCredits + totalSemesterCredits;
-
-  const newCGPA = (
-    denominator === 0
-      ? 0
-      : (safePastCredits * safePastCGPA + totalPoints) / denominator
-  ).toFixed(3);
-
-  const handleGradeChange = (index, value) => {
-    const updated = [...grades];
-    updated[index] = value;
-    setGrades(updated);
+    setShowToast(true);
+    const t = setTimeout(() => setShowToast(false), 3000);
+    setTimerId(t);
   };
 
-  const handleCourseChange = (index, field, value) => {
+  const totalCredits = useMemo(() =>
+    courses.reduce((s, c) => s + (Number(c.credits) || 0), 0),
+    [courses]
+  );
+
+  const totalPoints = useMemo(() =>
+    courses.reduce((s, c, i) =>
+      s + (Number(c.credits) || 0) * gradeMap[grades[i]], 0
+    ),
+    [courses, grades]
+  );
+
+  const semesterGPA = (totalCredits === 0 ? 0 : totalPoints / totalCredits).toFixed(3);
+
+  const newCGPA = (
+    ((pastCredits || 0) * (pastCGPA || 0) + totalPoints) /
+    ((pastCredits || 0) + totalCredits || 1)
+  ).toFixed(3);
+
+  const updateCourse = (i, field, value) => {
     const updated = [...courses];
-    updated[index] = {
-      ...updated[index],
-      [field]: field === "credits" ? Number(value) : value,
-    };
+    updated[i][field] = field === "credits" ? Number(value) : value;
     setCourses(updated);
   };
 
-  const removeCourse = (index) => {
-    if (undoTimer) clearTimeout(undoTimer);
-
-    setLastDeleted({
-      course: courses[index],
-      grade: grades[index],
-      index,
-    });
-
-    setCourses((prev) => prev.filter((_, i) => i !== index));
-    setGrades((prev) => prev.filter((_, i) => i !== index));
-
-    const t = setTimeout(() => {
-      setLastDeleted(null);
-    }, 5000);
-    setUndoTimer(t);
-  };
-
-  const undoDelete = () => {
-    if (!lastDeleted) return;
-
-    if (undoTimer) clearTimeout(undoTimer);
-
-    const newCourses = [...courses];
-    const newGrades = [...grades];
-
-    newCourses.splice(lastDeleted.index, 0, lastDeleted.course);
-    newGrades.splice(lastDeleted.index, 0, lastDeleted.grade);
-
-    setCourses(newCourses);
-    setGrades(newGrades);
-    setLastDeleted(null);
+  const updateGrade = (i, value) => {
+    const updated = [...grades];
+    updated[i] = value;
+    setGrades(updated);
   };
 
   const addCourse = () => {
@@ -116,22 +94,32 @@ export default function GPACalculator() {
     setGrades([...grades, "A+"]);
   };
 
+  const removeCourse = (i) => {
+    setCourses((prev) => prev.filter((_, idx) => idx !== i));
+    setGrades((prev) => prev.filter((_, idx) => idx !== i));
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
+
+      {/* Toast */}
+      {showToast && (
+        <div className="fixed top-5 right-5 bg-green-500 text-white px-4 py-2 rounded-xl shadow">
+          Saved successfully ✅
+        </div>
+      )}
+
       <div className="max-w-5xl mx-auto space-y-6">
 
-        {/* Undo Banner */}
-        {lastDeleted && (
-          <div className="bg-yellow-100 border border-yellow-300 p-3 rounded-xl flex justify-between items-center">
-            <span>Course deleted (undo within 5s)</span>
-            <button
-              onClick={undoDelete}
-              className="text-blue-600 font-medium"
-            >
-              Undo
-            </button>
-          </div>
-        )}
+        {/* Save */}
+        <div className="flex justify-end">
+          <button
+            onClick={saveData}
+            className="bg-green-600 text-white px-4 py-2 rounded-xl"
+          >
+            💾 Save
+          </button>
+        </div>
 
         {/* Inputs */}
         <div className="bg-white p-4 rounded-2xl shadow grid md:grid-cols-2 gap-4">
@@ -188,14 +176,12 @@ export default function GPACalculator() {
               </tr>
             </thead>
             <tbody>
-              {courses.map((course, index) => (
-                <tr key={index} className="border-t">
+              {courses.map((c, i) => (
+                <tr key={i} className="border-t hover:bg-gray-50">
                   <td className="p-2">
                     <input
-                      value={course.name}
-                      onChange={(e) =>
-                        handleCourseChange(index, "name", e.target.value)
-                      }
+                      value={c.name}
+                      onChange={(e) => updateCourse(i, "name", e.target.value)}
                       className="w-full border rounded p-1"
                     />
                   </td>
@@ -203,32 +189,28 @@ export default function GPACalculator() {
                   <td className="p-2 text-center">
                     <input
                       type="number"
-                      value={course.credits}
-                      onChange={(e) =>
-                        handleCourseChange(index, "credits", e.target.value)
-                      }
+                      value={c.credits}
+                      onChange={(e) => updateCourse(i, "credits", e.target.value)}
                       className="w-20 border rounded p-1 text-center"
                     />
                   </td>
 
                   <td className="p-2 text-center">
                     <select
-                      value={grades[index]}
-                      onChange={(e) =>
-                        handleGradeChange(index, e.target.value)
-                      }
+                      value={grades[i]}
+                      onChange={(e) => updateGrade(i, e.target.value)}
                       className="border rounded p-1"
                     >
                       {Object.keys(gradeMap).map((g) => (
-                        <option key={g} value={g}>{g}</option>
+                        <option key={g}>{g}</option>
                       ))}
                     </select>
                   </td>
 
                   <td className="p-2 text-center">
                     <button
-                      onClick={() => removeCourse(index)}
-                      className="text-red-500"
+                      onClick={() => removeCourse(i)}
+                      className="text-red-500 hover:text-red-700"
                     >
                       Delete
                     </button>
