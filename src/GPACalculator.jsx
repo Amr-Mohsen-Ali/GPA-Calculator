@@ -12,7 +12,7 @@ const gradeMap = {
   "F": 0.0,
 };
 
-const coursesData = [
+const initialCourses = [
   { name: "CSE326 Analysis and Design of Algorithms", credits: 3 },
   { name: "CSE328 Computer Networks Lec", credits: 2 },
   { name: "CSE329 Computer Networks Lab/Tut", credits: 1 },
@@ -28,17 +28,24 @@ const coursesData = [
 export default function GPACalculator() {
   const [pastCGPA, setPastCGPA] = useState(3.0);
   const [pastCredits, setPastCredits] = useState(97);
-  const [grades, setGrades] = useState(coursesData.map(() => "A"));
 
-  const totalSemesterCredits = 18;
+  const [courses, setCourses] = useState(initialCourses);
+  const [grades, setGrades] = useState(initialCourses.map(() => "A+"));
+
+  const totalSemesterCredits = useMemo(() => {
+    return courses.reduce((sum, c) => sum + (Number(c.credits) || 0), 0);
+  }, [courses]);
 
   const totalPoints = useMemo(() => {
-    return coursesData.reduce((sum, course, i) => {
-      return sum + course.credits * gradeMap[grades[i]];
+    return courses.reduce((sum, course, i) => {
+      const credits = Number(course.credits) || 0;
+      return sum + credits * gradeMap[grades[i]];
     }, 0);
-  }, [grades]);
+  }, [courses, grades]);
 
-  const semesterGPA = (totalPoints / totalSemesterCredits).toFixed(3);
+  const semesterGPA = (
+    totalSemesterCredits === 0 ? 0 : totalPoints / totalSemesterCredits
+  ).toFixed(3);
 
   const safePastCGPA = isNaN(pastCGPA) ? 0 : pastCGPA;
   const safePastCredits = isNaN(pastCredits) ? 0 : pastCredits;
@@ -51,22 +58,29 @@ export default function GPACalculator() {
       : (safePastCredits * safePastCGPA + totalPoints) / denominator
   ).toFixed(3);
 
-  const handleChange = (index, value) => {
+  const handleGradeChange = (index, value) => {
     const updated = [...grades];
     updated[index] = value;
     setGrades(updated);
+  };
+
+  const handleCourseChange = (index, field, value) => {
+    const updated = [...courses];
+    updated[index] = {
+      ...updated[index],
+      [field]: field === "credits" ? Number(value) : value,
+    };
+    setCourses(updated);
   };
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-5xl mx-auto space-y-6">
 
-        {/* CGPA & Past Credits Input */}
+        {/* Inputs */}
         <div className="bg-white p-4 rounded-2xl shadow grid md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Past CGPA
-            </label>
+            <label className="block text-sm font-medium mb-2">Past CGPA</label>
             <input
               type="number"
               step="0.001"
@@ -77,9 +91,7 @@ export default function GPACalculator() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Past Total Credits
-            </label>
+            <label className="block text-sm font-medium mb-2">Past Credits</label>
             <input
               type="number"
               value={pastCredits}
@@ -90,42 +102,63 @@ export default function GPACalculator() {
         </div>
 
         {/* Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-blue-600 text-white p-6 rounded-2xl shadow">
-            <p className="text-sm">Semester GPA</p>
+        <div className="grid md:grid-cols-2 gap-6">
+          <div className="bg-blue-600 text-white p-6 rounded-2xl">
+            <p>Semester GPA</p>
             <h2 className="text-3xl font-bold">{semesterGPA}</h2>
           </div>
 
-          <div className="bg-green-600 text-white p-6 rounded-2xl shadow">
-            <p className="text-sm">New CGPA</p>
+          <div className="bg-green-600 text-white p-6 rounded-2xl">
+            <p>New CGPA</p>
             <h2 className="text-3xl font-bold">{newCGPA}</h2>
           </div>
         </div>
 
-        {/* Courses Table */}
+        {/* Table */}
         <div className="bg-white rounded-2xl shadow overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-100">
               <tr>
-                <th className="p-3 text-left">Course</th>
+                <th className="p-3 text-left">Course Name</th>
                 <th className="p-3">Credits</th>
                 <th className="p-3">Grade</th>
               </tr>
             </thead>
             <tbody>
-              {coursesData.map((course, index) => (
+              {courses.map((course, index) => (
                 <tr key={index} className="border-t">
-                  <td className="p-3">{course.name}</td>
-                  <td className="p-3 text-center">{course.credits}</td>
-                  <td className="p-3 text-center">
+                  <td className="p-2">
+                    <input
+                      value={course.name}
+                      onChange={(e) =>
+                        handleCourseChange(index, "name", e.target.value)
+                      }
+                      className="w-full border rounded p-1"
+                    />
+                  </td>
+
+                  <td className="p-2 text-center">
+                    <input
+                      type="number"
+                      value={course.credits}
+                      onChange={(e) =>
+                        handleCourseChange(index, "credits", e.target.value)
+                      }
+                      className="w-20 border rounded p-1 text-center"
+                    />
+                  </td>
+
+                  <td className="p-2 text-center">
                     <select
                       value={grades[index]}
-                      onChange={(e) => handleChange(index, e.target.value)}
-                      className="border rounded-lg p-1"
+                      onChange={(e) =>
+                        handleGradeChange(index, e.target.value)
+                      }
+                      className="border rounded p-1"
                     >
-                      {Object.keys(gradeMap).map((grade) => (
-                        <option key={grade} value={grade}>
-                          {grade}
+                      {Object.keys(gradeMap).map((g) => (
+                        <option key={g} value={g}>
+                          {g}
                         </option>
                       ))}
                     </select>
