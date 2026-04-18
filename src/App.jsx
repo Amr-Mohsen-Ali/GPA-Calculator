@@ -1,8 +1,7 @@
-
-import GPACalculator from './GPACalculator'
+import GPACalculator from "./GPACalculator";
 
 function App() {
-  return <GPACalculator />
+  return <GPACalculator />;
 }
 
-export default App
+export default App;
