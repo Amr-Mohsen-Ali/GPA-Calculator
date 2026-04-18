@@ -73,12 +73,16 @@ export default function GPACalculator() {
     setCourses(updated);
   };
 
-  // ✅ NEW: delete course
+  // ✅ delete course
   const removeCourse = (index) => {
-    const newCourses = courses.filter((_, i) => i !== index);
-    const newGrades = grades.filter((_, i) => i !== index);
-    setCourses(newCourses);
-    setGrades(newGrades);
+    setCourses((prev) => prev.filter((_, i) => i !== index));
+    setGrades((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // ✅ NEW: add course
+  const addCourse = () => {
+    setCourses([...courses, { name: "New Course", credits: 3 }]);
+    setGrades([...grades, "A+"]);
   };
 
   return (
@@ -124,6 +128,15 @@ export default function GPACalculator() {
 
         {/* Table */}
         <div className="bg-white rounded-2xl shadow overflow-hidden">
+          <div className="flex justify-between items-center p-4 border-b">
+            <h2 className="font-semibold">Courses</h2>
+            <button
+              onClick={addCourse}
+              className="bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700"
+            >
+              + Add Course
+            </button>
+          </div>
           <table className="w-full text-sm">
             <thead className="bg-gray-100">
               <tr>
@@ -175,6 +188,7 @@ export default function GPACalculator() {
 
                   <td className="p-2 text-center">
                     <button
+                      type="button"
                       onClick={() => removeCourse(index)}
                       className="text-red-500 hover:text-red-700 font-medium"
                     >
