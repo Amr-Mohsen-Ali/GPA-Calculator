@@ -73,6 +73,14 @@ export default function GPACalculator() {
     setCourses(updated);
   };
 
+  // ✅ NEW: delete course
+  const removeCourse = (index) => {
+    const newCourses = courses.filter((_, i) => i !== index);
+    const newGrades = grades.filter((_, i) => i !== index);
+    setCourses(newCourses);
+    setGrades(newGrades);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-5xl mx-auto space-y-6">
@@ -122,6 +130,7 @@ export default function GPACalculator() {
                 <th className="p-3 text-left">Course Name</th>
                 <th className="p-3">Credits</th>
                 <th className="p-3">Grade</th>
+                <th className="p-3">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -162,6 +171,15 @@ export default function GPACalculator() {
                         </option>
                       ))}
                     </select>
+                  </td>
+
+                  <td className="p-2 text-center">
+                    <button
+                      onClick={() => removeCourse(index)}
+                      className="text-red-500 hover:text-red-700 font-medium"
+                    >
+                      Delete
+                    </button>
                   </td>
                 </tr>
               ))}
