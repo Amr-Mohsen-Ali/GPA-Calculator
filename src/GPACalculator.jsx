@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 
 const gradeMap = {
   "A+": 4.0,
@@ -31,6 +31,10 @@ export default function GPACalculator() {
 
   const [courses, setCourses] = useState(initialCourses);
   const [grades, setGrades] = useState(initialCourses.map(() => "A+"));
+
+  // ✅ undo state
+  const [lastDeleted, setLastDeleted] = useState(null);
+  const [undoTimer, setUndoTimer] = useState(null);
 
   const totalSemesterCredits = useMemo(() => {
     return courses.reduce((sum, c) => sum + (Number(c.credits) || 0), 0);
@@ -73,13 +77,40 @@ export default function GPACalculator() {
     setCourses(updated);
   };
 
-  // ✅ delete course
   const removeCourse = (index) => {
+    if (undoTimer) clearTimeout(undoTimer);
+
+    setLastDeleted({
+      course: courses[index],
+      grade: grades[index],
+      index,
+    });
+
     setCourses((prev) => prev.filter((_, i) => i !== index));
     setGrades((prev) => prev.filter((_, i) => i !== index));
+
+    const t = setTimeout(() => {
+      setLastDeleted(null);
+    }, 5000);
+    setUndoTimer(t);
   };
 
-  // ✅ NEW: add course
+  const undoDelete = () => {
+    if (!lastDeleted) return;
+
+    if (undoTimer) clearTimeout(undoTimer);
+
+    const newCourses = [...courses];
+    const newGrades = [...grades];
+
+    newCourses.splice(lastDeleted.index, 0, lastDeleted.course);
+    newGrades.splice(lastDeleted.index, 0, lastDeleted.grade);
+
+    setCourses(newCourses);
+    setGrades(newGrades);
+    setLastDeleted(null);
+  };
+
   const addCourse = () => {
     setCourses([...courses, { name: "New Course", credits: 3 }]);
     setGrades([...grades, "A+"]);
@@ -89,28 +120,37 @@ export default function GPACalculator() {
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-5xl mx-auto space-y-6">
 
+        {/* Undo Banner */}
+        {lastDeleted && (
+          <div className="bg-yellow-100 border border-yellow-300 p-3 rounded-xl flex justify-between items-center">
+            <span>Course deleted (undo within 5s)</span>
+            <button
+              onClick={undoDelete}
+              className="text-blue-600 font-medium"
+            >
+              Undo
+            </button>
+          </div>
+        )}
+
         {/* Inputs */}
         <div className="bg-white p-4 rounded-2xl shadow grid md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-2">Past CGPA</label>
-            <input
-              type="number"
-              step="0.001"
-              value={pastCGPA}
-              onChange={(e) => setPastCGPA(Number(e.target.value))}
-              className="w-full border rounded-lg p-2"
-            />
-          </div>
+          <input
+            type="number"
+            step="0.001"
+            value={pastCGPA}
+            onChange={(e) => setPastCGPA(Number(e.target.value))}
+            placeholder="Past CGPA"
+            className="border p-2 rounded"
+          />
 
-          <div>
-            <label className="block text-sm font-medium mb-2">Past Credits</label>
-            <input
-              type="number"
-              value={pastCredits}
-              onChange={(e) => setPastCredits(Number(e.target.value))}
-              className="w-full border rounded-lg p-2"
-            />
-          </div>
+          <input
+            type="number"
+            value={pastCredits}
+            onChange={(e) => setPastCredits(Number(e.target.value))}
+            placeholder="Past Credits"
+            className="border p-2 rounded"
+          />
         </div>
 
         {/* Metrics */}
@@ -132,11 +172,12 @@ export default function GPACalculator() {
             <h2 className="font-semibold">Courses</h2>
             <button
               onClick={addCourse}
-              className="bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700"
+              className="bg-blue-600 text-white px-4 py-2 rounded-xl"
             >
               + Add Course
             </button>
           </div>
+
           <table className="w-full text-sm">
             <thead className="bg-gray-100">
               <tr>
@@ -179,18 +220,15 @@ export default function GPACalculator() {
                       className="border rounded p-1"
                     >
                       {Object.keys(gradeMap).map((g) => (
-                        <option key={g} value={g}>
-                          {g}
-                        </option>
+                        <option key={g} value={g}>{g}</option>
                       ))}
                     </select>
                   </td>
 
                   <td className="p-2 text-center">
                     <button
-                      type="button"
                       onClick={() => removeCourse(index)}
-                      className="text-red-500 hover:text-red-700 font-medium"
+                      className="text-red-500"
                     >
                       Delete
                     </button>
